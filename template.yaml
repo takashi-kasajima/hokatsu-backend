@@ -23,7 +23,7 @@ Resources:
         ScheduleEvent:
           Type: Schedule
           Properties:
-            Schedule: rate(1 day)
+            Schedule: rate(30 day)
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ./lambda
