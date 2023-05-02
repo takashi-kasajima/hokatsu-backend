@@ -73,7 +73,7 @@ def lambda_handler(event, context):
             dynamodb = boto3.resource("dynamodb")
 
         table = dynamodb.Table("ota")
-        with table.batch_writer() as batch:
+        with table.batch_writer(overwrite_by_pkeys=["phone"]) as batch:
             for record in records:
                 batch.put_item(Item=record)
         return {"statusCode": 200, "body": "succeeded"}
