@@ -26,7 +26,7 @@ def lambda_handler(event, context):
         dataList = pandas.concat(df)
         data = dataList.rename(
             {
-                "番号": "id",
+                "番号": "list_number",
                 "種別": "type",
                 "(延)": "can_extend",
                 "保育所": "name",
@@ -46,7 +46,7 @@ def lambda_handler(event, context):
         data.loc[:, "can_extend"] = data["can_extend"] == "*"
         data.loc[:, "emergency"] = data["emergency"] == "★"
         attributes = [
-            "id",
+            "list_number",
             "0_year_old",
             "1_year_old",
             "2_years_old",
