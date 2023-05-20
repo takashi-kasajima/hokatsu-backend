@@ -23,7 +23,7 @@ Resources:
         ScheduleEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(00 14 ? * SAT *)
+            Schedule: cron(30 14 ? * SAT *)
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ./lambda
