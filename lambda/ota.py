@@ -1,7 +1,6 @@
 import io
 import os
 import json
-from uuid import uuid4
 import pandas
 from tabula import read_pdf
 import requests
