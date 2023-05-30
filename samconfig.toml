@@ -7,4 +7,3 @@ region = "ap-northeast-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 disable_rollback = true
-image_repositories = ["Ota=046759008678.dkr.ecr.ap-northeast-1.amazonaws.com/hokatsuapp66bc97c4/otace2f7df9repo"]
