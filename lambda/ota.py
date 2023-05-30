@@ -53,12 +53,14 @@ def lambda_handler(event, context):
             "4_years_old",
             "5_years_old",
         ]
+
         for attribute in attributes:
             data.loc[pandas.isna(data[attribute]), attribute] = 0
             data.loc[data[attribute] == "×", attribute] = -1
             data[attribute] = pandas.to_numeric(
                 data[attribute], errors="coerce", downcast="signed"
             )
+
         result = data.to_json(orient="records")
         records = json.loads(result)
         if os.getenv("AWS_SAM_LOCAL") == "true":
