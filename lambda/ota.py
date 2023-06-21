@@ -2,6 +2,8 @@ import io
 import os
 import json
 import pandas
+import hashlib
+import uuid
 from tabula import read_pdf
 import requests
 import boto3
@@ -10,6 +12,17 @@ from bs4 import BeautifulSoup
 
 def lambda_handler(event, context):
     try:
+        if os.getenv("AWS_SAM_LOCAL") == "true":
+            dynamodb = boto3.resource(
+                "dynamodb",
+                endpoint_url="http://dynamodb-local:8000",
+                region_name="ap-northeast-1",
+                aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+                aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+            )
+        else:
+            dynamodb = boto3.resource("dynamodb")
+
         baseUrl = (
             "https://www.city.ota.tokyo.jp/seikatsu/kodomo/hoiku/hoikushisetsu_nyukibo/"
         )
@@ -19,8 +32,15 @@ def lambda_handler(event, context):
         links = soup.find_all("a")
         for link in links:
             if ".pdf" in link.get("href", []):
+                version = link.get("href").split("/")[1].replace(".pdf", "")
                 response = requests.get(baseUrl + link.get("href"))
                 pdfFile = io.BytesIO(response.content)
+        tableList = dynamodb.tables.all()
+        tableName = "ota" + version
+        for existingTable in tableList:
+            if tableName == existingTable._name:
+                return {"statusCode": 200, "body": "succeeded"}
+
         df = read_pdf(pdfFile, pages="all", lattice=True)
         dataList = pandas.concat(df)
         data = dataList.rename(
@@ -44,6 +64,12 @@ def lambda_handler(event, context):
         ).drop(columns=["Unnamed: 0", "Unnamed: 1"])
         data.loc[:, "can_extend"] = data["can_extend"] == "*"
         data.loc[:, "emergency"] = data["emergency"] == "★"
+        data["id"] = data.apply(
+            lambda x: str(
+                uuid.UUID(hex=hashlib.md5(repr(x["phone"]).encode("UTF-8")).hexdigest())
+            ),
+            axis=1,
+        )
         attributes = [
             "list_number",
             "0_year_old",
@@ -63,19 +89,74 @@ def lambda_handler(event, context):
 
         result = data.to_json(orient="records")
         records = json.loads(result)
-        if os.getenv("AWS_SAM_LOCAL") == "true":
-            dynamodb = boto3.resource(
-                "dynamodb",
-                endpoint_url="http://dynamodb-local:8000",
-                region_name="ap-northeast-1",
-                aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
-                aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-            )
-        else:
-            dynamodb = boto3.resource("dynamodb")
 
-        table = dynamodb.Table("ota")
-        with table.batch_writer(overwrite_by_pkeys=["phone"]) as batch:
+        table = dynamodb.create_table(
+            TableName=tableName,
+            KeySchema=[
+                {"AttributeName": "id", "KeyType": "HASH"},
+                {"AttributeName": "list_number", "KeyType": "RANGE"},
+            ],
+            AttributeDefinitions=[
+                {"AttributeName": "id", "AttributeType": "S"},
+                {"AttributeName": "list_number", "AttributeType": "N"},
+            ],
+            BillingMode="PROVISIONED",
+            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+        )
+        table.wait_until_exists()
+
+        if os.getenv("AWS_SAM_LOCAL") != "true":
+            autoScaling = boto3.client(
+                "application-autoscaling",
+            )
+            autoScaling.register_scalable_target(
+                ServiceNamespace="dynamodb",
+                ResourceId="table/" + tableName,
+                ScalableDimension="dynamodb:table:ReadCapacityUnits",
+                MinCapacity=1,
+                MaxCapacity=100,
+            )
+            autoScaling.register_scalable_target(
+                ServiceNamespace="dynamodb",
+                ResourceId="table/" + tableName,
+                ScalableDimension="dynamodb:table:WriteCapacityUnits",
+                MinCapacity=1,
+                MaxCapacity=100,
+            )
+            targetValue = 70
+            scale = 60
+            autoScaling.put_scaling_policy(
+                ServiceNamespace="dynamodb",
+                ResourceId="table/" + tableName,
+                PolicyType="TargetTrackingScaling",
+                PolicyName="ScaleDynamoDBReadCapacityUtilization",
+                ScalableDimension="dynamodb:table:ReadCapacityUnits",
+                TargetTrackingScalingPolicyConfiguration={
+                    "TargetValue": targetValue,
+                    "PredefinedMetricSpecification": {
+                        "PredefinedMetricType": "DynamoDBReadCapacityUtilization"
+                    },
+                    "ScaleOutCooldown": scale,
+                    "ScaleInCooldown": scale,
+                },
+            )
+            autoScaling.put_scaling_policy(
+                ServiceNamespace="dynamodb",
+                ResourceId="table/" + tableName,
+                PolicyType="TargetTrackingScaling",
+                PolicyName="ScaleDynamoDBWriteCapacityUtilization",
+                ScalableDimension="dynamodb:table:WriteCapacityUnits",
+                TargetTrackingScalingPolicyConfiguration={
+                    "TargetValue": targetValue,
+                    "PredefinedMetricSpecification": {
+                        "PredefinedMetricType": "DynamoDBWriteCapacityUtilization"
+                    },
+                    "ScaleOutCooldown": scale,
+                    "ScaleInCooldown": scale,
+                },
+            )
+
+        with table.batch_writer(overwrite_by_pkeys=["id"]) as batch:
             for record in records:
                 batch.put_item(Item=record)
         return {"statusCode": 200, "body": "succeeded"}
