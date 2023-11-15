@@ -1,4 +1,8 @@
 .aws-sam/
 
 
+env.json
+
+events.json
+
 .DS_Store

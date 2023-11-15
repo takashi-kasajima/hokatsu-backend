@@ -24,7 +24,33 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: cron(30 4 ? * MON-FRI *)
+      Environment:
+        Variables:
+          SQS_URL: !GetAtt NotificationQueue.QueueUrl
     Metadata:
       Dockerfile: Dockerfile
-      DockerContext: ./lambda
+      DockerContext: ./lambda/ota
       DockerTag: python3.10-v1
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: NotificationQueue
+      VisibilityTimeout: 600
+  Notification:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      FunctionName: notification
+      Architectures:
+        - x86_64
+      Policies: AmazonDynamoDBFullAccess
+      Handler: main
+      Runtime: go1.x
+      CodeUri: ./lambda/notification
+      Environment:
+        Variables:
+          SQS_QUEUE_URL: !GetAtt NotificationQueue.QueueUrl
+      Events:
+        Trigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt NotificationQueue.Arn
