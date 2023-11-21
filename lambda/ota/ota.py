@@ -90,7 +90,10 @@ def lambda_handler(event, context):
             for record in records:
                 batch.put_item(Item=record)
         sqs.send_message(QueueUrl=os.getenv("SQS_URL"), MessageBody="ota")
-        return {"statusCode": 200, "body": "succeeded"}
+        return {
+            "statusCode": 200,
+            "body": f'successfully sent a message to {os.getenv("SQS_URL")}',
+        }
     except Exception as e:
         # Handle any other errors that may occur
         error_message = f"Error: {str(e)}"
