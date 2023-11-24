@@ -19,7 +19,9 @@ Resources:
       PackageType: Image
       Architectures:
         - x86_64
-      Policies: AmazonDynamoDBFullAccess
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AmazonSQSFullAccess
       Events:
         ScheduleEvent:
           Type: Schedule
@@ -43,7 +45,9 @@ Resources:
       FunctionName: notification
       Architectures:
         - x86_64
-      Policies: AmazonDynamoDBFullAccess
+      Policies:
+        - AmazonDynamoDBFullAccess
+        - AmazonSQSFullAccess
       Handler: main
       Runtime: go1.x
       CodeUri: ./lambda/notification
