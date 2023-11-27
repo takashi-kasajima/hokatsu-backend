@@ -48,6 +48,7 @@ Resources:
       Policies:
         - AmazonDynamoDBFullAccess
         - AmazonSQSFullAccess
+        - AmazonSESFullAccess
       Handler: main
       Runtime: go1.x
       CodeUri: ./lambda/notification
