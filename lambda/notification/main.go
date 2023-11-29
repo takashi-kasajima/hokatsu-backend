@@ -66,6 +66,7 @@ type user struct {
 
 func processSQSMessage(ctx context.Context, event events.SQSEvent) error {
 	for _, message := range event.Records {
+		fmt.Print(message)
 		area := *&message.Body
 		areaTable := ddbClient.Table(area)
 		userTable := ddbClient.Table("users")
