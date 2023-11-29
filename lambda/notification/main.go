@@ -66,7 +66,6 @@ type user struct {
 
 func processSQSMessage(ctx context.Context, event events.SQSEvent) error {
 	for _, message := range event.Records {
-		fmt.Print(message)
 		area := *&message.Body
 		areaTable := ddbClient.Table(area)
 		userTable := ddbClient.Table("users")
@@ -89,7 +88,9 @@ func processSQSMessage(ctx context.Context, event events.SQSEvent) error {
 					targets = append(targets, school)
 				}
 			}
+			fmt.Print(user)
 			for _, target := range targets {
+				fmt.Print(target)
 				var targetValue int
 				switch user.TargetClass {
 				case 0:
