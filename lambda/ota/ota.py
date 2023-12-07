@@ -32,10 +32,19 @@ def lambda_handler(event, context):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, "html.parser")
         links = soup.find_all("a")
+        filesTable = dynamodb.Table("files")
+        fileNameItem = filesTable.get_item(Key={"area": "ota"})
+        existingFileName = fileNameItem["Item"]["file_name"]
         for link in links:
             if ".pdf" in link.get("href", []):
                 response = requests.get(baseUrl + link.get("href"))
+                fileName = link.get("href").split("/")[1]
                 pdfFile = io.BytesIO(response.content)
+        if fileName == existingFileName:
+            return {"statusCode": 200, "body": "the file already exists"}
+        filesTable.update_item(
+            Key={"area": "ota"}, AttributeUpdates={"file_name": {"Value": fileName}}
+        )
         df = read_pdf(pdfFile, pages="all", lattice=True)
         dataList = pandas.concat(df)
         data = dataList.rename(
